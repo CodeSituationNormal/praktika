@@ -4,11 +4,11 @@
 ofstream nodes_out, elements_out, faces_out, time_out; //- f_out
 
 void buildGrid() {
-   nodes_out.open("../nodes_out.txt");
-   elements_out.open("../elements_out.txt");
+   nodes_out.open("../processFiles/nodes_out.txt");
+   elements_out.open("../processFiles/elements_out.txt");
    // f_out.open("../f.txt");
-   faces_out.open("../faces.txt");
-   time_out.open("../time.txt");
+   faces_out.open("../processFiles/faces.txt");
+   time_out.open("../processFiles/time.txt");
 
    vector<double> x_coords(nx);
    vector<double> y_coords(ny);
@@ -135,8 +135,8 @@ void buildGrid() {
    time_out.close();
 }
 void input() {
-   ifstream inputGrid("../grid.txt");
-   ifstream inputNodes("../nodes.txt");
+   ifstream inputGrid("../input/grid.txt");
+   ifstream inputNodes("../input/nodes.txt");
 
    if (!inputGrid.is_open() || !inputNodes.is_open()) {
       cerr << "Unable to open input files." << endl;

@@ -448,8 +448,8 @@ void fourth_order_temporal_scheme() {
 int main() {
    // eps = 1e-14;   
    // maxiter = 10000;
-   outf.open("../output.txt");
-   outdif.open("../dif.txt");
+   outf.open("../output/output.txt");
+   outdif.open("../output/dif.txt");
    int testNumber = 0;
 
    // cout << "Enter the test number: ";

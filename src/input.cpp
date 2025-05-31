@@ -3,7 +3,7 @@
 void input_nodes(int testNumber) {
    // char filename[50];
    // sprintf_s(filename, "nodes%d.txt", testNumber);
-   string filename = "../nodes_out.txt";
+   string filename = "../processFiles/nodes_out.txt";
 
    ifstream nodes_f(filename);
    if (!nodes_f.is_open()) {
@@ -27,7 +27,7 @@ void input_nodes(int testNumber) {
 void input_el(int testNumber) {
    // char filename[50];
    // sprintf_s(filename, "el%d.txt", testNumber);
-   string filename = "../elements_out.txt";
+   string filename = "../processFiles/elements_out.txt";
 
    ifstream el_f(filename);
    if (!el_f.is_open()) {
@@ -53,7 +53,7 @@ void input_el(int testNumber) {
 void input_faces(int testNumber) {
    // char filename[50];
    // sprintf_s(filename, "face%d.txt", testNumber);
-   string filename = "../faces.txt";
+   string filename = "../processFiles/faces.txt";
 
    ifstream face_f(filename);
    if (!face_f.is_open()) {
@@ -80,7 +80,7 @@ void input_el_coef(int testNumber) {
    // char filename[50];
    // sprintf_s(filename, "coef%d.txt", testNumber); 
 
-   string filename = "../coef.txt";
+   string filename = "../input/coef.txt";
 
    ifstream el_coef_f(filename);
    if (!el_coef_f.is_open()) {
@@ -99,7 +99,7 @@ void input_f(int testNumber) {
    // char filename[50];
    // sprintf_s(filename, "f%d.txt", testNumber);
 
-   string filename = "../f.txt";
+   string filename = "../processFiles/f.txt";
 
    ifstream f_f(filename);
    if (!f_f.is_open()) {
@@ -120,7 +120,7 @@ void input_t(int testNumber) {
    // char filename[50];
    // sprintf_s(filename, "f%d.txt", testNumber);
 
-   string filename = "../time.txt";
+   string filename = "../processFiles/time.txt";
 
    ifstream t_t(filename);
    if (!t_t.is_open()) {
