@@ -135,6 +135,7 @@ void loc_hex(int f_el_n) {
    M_hex.resize(8, vector<double>(8,0));
    G_hex.resize(8, vector<double>(8,0));
    A_hex.resize(8, vector<double>(8,0));
+   b_hex.clear();
    b_hex.resize(8,0);
 
    for (int i = 0; i < 8; i++) {
@@ -154,6 +155,14 @@ void loc_hex(int f_el_n) {
    }
 
    M_quad.clear(), G_quad.clear(), Mz.clear(), Gz.clear();
+
+   // cout << "M_hex:" << endl;
+   // for (int i = 0; i < 8; i++) {
+   //    for (int j = 0; j < 8; j++) {
+   //       cout << M_hex[i][j] << " ";
+   //    }
+   //    cout << endl;
+   // }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
