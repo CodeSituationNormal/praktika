@@ -49,6 +49,6 @@ def plot_3d_mesh(nodes, elements):
     plt.show()
 
 if __name__ == "__main__":
-    nodes = read_nodes("nodes_out.txt")
-    elements = read_elements("elements_out.txt", zero_indexed=True)
+    nodes = read_nodes("processFiles/nodes_out.txt")
+    elements = read_elements("processFiles/elements_out.txt", zero_indexed=True)
     plot_3d_mesh(nodes, elements)

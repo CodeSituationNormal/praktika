@@ -1,6 +1,5 @@
 #include "common_includes.h"
 
-
 int nx, ny, nz, nt, n;
 double x_min, x_max, y_min, y_max, z_min, z_max, t_min, t_max, kx, ky, kz, kt, hx, hy, hz, ht;
 vector<int> bc1;

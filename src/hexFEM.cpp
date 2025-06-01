@@ -7,6 +7,157 @@ double sigma() {
    return 1;
 }
 
+double lambda() {
+   return 1;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+
+vector<vector<double>> M_quad, Mz, M_hex, A_hex;  
+vector<vector<double>> G_quad, Gz, G_hex;  
+vector<double> b_hex;
+double s, e;
+vector<double> N, dN_ds, dN_de;
+
+void shape_functions() {
+   N.resize(4), dN_ds.resize(4), dN_de.resize(4);
+   N[0] = (1.0 - s) * (1.0 - e);
+   N[1] = s * (1.0 - e);
+   N[2] = s * e;
+   N[3] = (1.0 - s) * e;
+
+   dN_ds[0] = -(1.0 - e);
+   dN_ds[1] =  (1.0 - e);
+   dN_ds[2] =  e;
+   dN_ds[3] = -e;
+
+   dN_de[0] = -(1.0 - s);
+   dN_de[1] = -s;
+   dN_de[2] =  s;
+   dN_de[3] =  (1.0 - s);
+}
+
+void loc_quad(int f_el_n) {
+   vector<double> x_lc, y_lc;
+   x_lc.resize(4), y_lc.resize(4);
+   for (int i = 0; i < 4; i++) {
+      x_lc[i] = nodes[el[f_el_n].node_n[i]].x;
+      y_lc[i] = nodes[el[f_el_n].node_n[i]].y;
+   }
+
+   M_quad = vector<vector<double>>(4, vector<double>(4, 0.0));
+   G_quad = vector<vector<double>>(4, vector<double>(4, 0.0));
+
+   const int nGauss = 2;
+   const double sqrt3 = 1.0 / sqrt(3.0);
+   double gaussPoints[nGauss] = { 0.5 * (1.0 - sqrt3), 0.5 * (1.0 + sqrt3) };
+   double gaussWeights[nGauss] = {0.5, 0.5};
+
+   for (int iq = 0; iq < nGauss; iq++) {
+      // double s = gaussPoints[iq];
+      s = gaussPoints[iq];
+      double ws = gaussWeights[iq];
+      for (int jq = 0; jq < nGauss; jq++) {
+         // double e = gaussPoints[jq];
+         e = gaussPoints[jq];
+         double we = gaussWeights[jq];
+         double weight = ws * we;
+
+         // shape_functions(s, e, N, dN_ds, dN_de);
+         shape_functions();
+
+         double dx_ds = 0.0, dx_de = 0.0;
+         double dy_ds = 0.0, dy_de = 0.0;
+         for (int k = 0; k < 4; k++) {
+               dx_ds += x_lc[k] * dN_ds[k];
+               dx_de += x_lc[k] * dN_de[k];
+               dy_ds += y_lc[k] * dN_ds[k];
+               dy_de += y_lc[k] * dN_de[k];
+         }
+
+         double detJ = dx_ds * dy_de - dx_de * dy_ds;
+         if (detJ <= 0.0) {
+            detJ = detJ * (-1.0);
+         }
+
+         double invJ[2][2] = {
+               {  dy_de / detJ, -dy_ds / detJ },
+               { -dx_de / detJ,  dx_ds / detJ }
+         };
+
+         double dN_dx[4], dN_dy[4];
+         for (int k = 0; k < 4; k++) {
+               dN_dx[k] = invJ[0][0] * dN_ds[k] + invJ[0][1] * dN_de[k];
+               dN_dy[k] = invJ[1][0] * dN_ds[k] + invJ[1][1] * dN_de[k];
+         }
+
+         for (int i = 0; i < 4; i++)
+            for (int j = 0; j < 4; j++) {
+               M_quad[i][j] += weight * N[i] * N[j] * detJ;
+               G_quad[i][j] += weight * (dN_dx[i] * dN_dx[j] + dN_dy[i] * dN_dy[j]) * detJ;
+            }
+      }
+   }
+}
+
+int mu(int index) {
+   return index % 4;
+}
+
+int nu(int index) {
+   int res = index / 4;
+   return res;
+}
+
+void loc_z(int f_el_n) {
+   int node_min_index = el[f_el_n].node_n[0];
+   int node_max_index = el[f_el_n].node_n[7];
+
+   el[f_el_n].hz = nodes[node_max_index].z - nodes[node_min_index].z;   
+
+   double coef_g = 1 / el[f_el_n].hz;
+   
+   Gz.resize(2,vector<double>(2));
+   Gz[0][0] = Gz[1][1] = coef_g;
+   Gz[1][0] = Gz[0][1] = -coef_g;
+
+   double coef_m = el[f_el_n].hz / 6;
+   
+   Mz.resize(2,vector<double>(2));
+   Mz[0][0] = Mz[1][1] = 2 * coef_m;
+   Mz[1][0] = Mz[0][1] = coef_m;
+}
+
+void loc_hex(int f_el_n) {
+   loc_quad(f_el_n);
+   loc_z(f_el_n);
+
+   M_hex.resize(8, vector<double>(8,0));
+   G_hex.resize(8, vector<double>(8,0));
+   A_hex.resize(8, vector<double>(8,0));
+   b_hex.resize(8,0);
+
+   for (int i = 0; i < 8; i++) {
+      double Mq1 = 0, Mq2 = 0, Mq3 = 0;
+      for (int j = 0; j < 8; j++) {
+         M_hex[i][j] = M_quad[mu(i)][mu(j)] * Mz[nu(i)][nu(j)];
+         G_hex[i][j] = G_quad[mu(i)][mu(j)] * Mz[nu(i)][nu(j)] + M_quad[mu(i)][mu(j)] * Gz[nu(i)][nu(j)];
+
+         A_hex[i][j] = sigma() * M_hex[i][j] + lambda() * G_hex[i][j];
+			b_hex[i] += nodes[el[f_el_n].node_n[j]].f * M_hex[i][j]; 
+
+         Mq1 += M_hex[i][j] * q1[el[f_el_n].node_n[j]];
+         Mq2 += M_hex[i][j] * q2[el[f_el_n].node_n[j]];
+         Mq3 += M_hex[i][j] * q3[el[f_el_n].node_n[j]];
+      }
+      b_hex[i] -= sigma() * (c_1 * Mq1 + c_2 * Mq2 + c_3 * Mq3);
+   }
+
+   M_quad.clear(), G_quad.clear(), Mz.clear(), Gz.clear();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+
 void generate_q123() {
    q1.resize(nodes_c);
    q2.resize(nodes_c);
@@ -183,7 +334,7 @@ static void local_el(int f_el_n) {
 			M_loc[i][j] = (hx * hy * hz) * coefX * coefY * coefZ; 
 			G_loc[i][j] = (hx * hy * hz) * (gx[i][j] / (hx * hx) + gy[i][j] / (hy * hy) + gz[i][j] / (hz * hz));
 
-			A_loc[i][j] = lam * G_loc[i][j] + sigma() * M_loc[i][j] * c_0;
+			A_loc[i][j] = lambda() * G_loc[i][j] + sigma() * M_loc[i][j] * c_0;
 			b_loc[i] += nodes[el[f_el_n].node_n[j]].f * M_loc[i][j]; 
 
          Mq1 += M_loc[i][j] * q1[el[f_el_n].node_n[j]];
@@ -308,6 +459,76 @@ void global_A() {
    val.clear();
 }
 
+///////////////////////////////////////////////////////////
+
+void global_A_hex() {
+   int i_gg, glob_i, glob_j;
+
+   A_hex.resize(8, vector<double>(8, 0));
+   b_hex.resize(8, 0);
+
+   di.resize(nodes_c, 0);
+   gg.resize(ig[nodes_c], 0);
+   b.resize(nodes_c, 0);
+
+   // Should be generated every time step
+   generate_bc1();
+   generate_f();
+   calc_c();
+
+   for (int k = 0; k < el_c; k++) {
+      loc_hex(k);
+      for (int i = 0; i < 8; i++) {
+         glob_i = el[k].node_n[i];
+         for (int j = 0; j < 8; j++) {
+            glob_j = el[k].node_n[j];
+            if (glob_i > glob_j) {
+               i_gg = find_el_pos(glob_i, glob_j);
+               gg[i_gg] += A_hex[i][j];
+            }
+         }
+         di[glob_i] += A_hex[i][i];
+         b[glob_i] += b_hex[i];
+      }
+      A_hex.clear();
+      M_hex.clear();
+      G_hex.clear();
+      b_hex.clear();
+   }
+   for (int j = 0; j < face_c; j++) {
+      glob_i = faces[j];
+      di[glob_i] = 1;
+      b[glob_i] = val[j];
+      for (int i = ig[glob_i]; i < ig[glob_i + 1]; i++) {
+         b[jg[i]] -= gg[i] * val[j];
+         gg[i] = 0;
+      }
+      for (int p = glob_i + 1; p < nodes_c; p++)
+         for (int i = ig[p]; i < ig[p + 1]; i++) {
+            if (jg[i] == glob_i) {
+               b[p] -= gg[i] * val[j];
+               gg[i] = 0;
+            }
+         }
+   }
+   // for (int j = 0; j < face_c; j++) cout << faces[j] << endl;
+   // cout << "di " << ": ";
+   // for (double node : di)
+   //    cout << node << " ";
+   // cout << "gg " << ": ";
+   // for (double node : gg)
+   //    cout << node << " ";
+   // cout << endl;
+   // cout << "b " << ": ";
+   // for (double node : b)
+   //    cout << node << " ";
+   // cout << endl;
+
+   val.clear();
+}
+
+///////////////////////////////////////////////////////////
+
 static void calc_Av(vector<double>& v, vector<double>& res) {
    for (int i = 0; i < nodes_c; i++) {
       res[i] = di[i] * v[i];
@@ -422,7 +643,8 @@ void fourth_order_temporal_scheme() {
    outf << endl;
    
    while(t_it != times_c){
-      global_A();
+      // global_A();
+      global_A_hex();
       CGM();
 
       // cout << "t = " << current_t << endl;
@@ -463,7 +685,7 @@ int main() {
    input_t(testNumber);
    
    portrait();
-   calc_h();
+   // calc_h();
 
    fourth_order_temporal_scheme();
 
