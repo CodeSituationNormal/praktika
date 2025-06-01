@@ -144,7 +144,7 @@ void loc_hex(int f_el_n) {
          M_hex[i][j] = M_quad[mu(i)][mu(j)] * Mz[nu(i)][nu(j)];
          G_hex[i][j] = G_quad[mu(i)][mu(j)] * Mz[nu(i)][nu(j)] + M_quad[mu(i)][mu(j)] * Gz[nu(i)][nu(j)];
 
-         A_hex[i][j] = sigma() * M_hex[i][j] + lambda() * G_hex[i][j];
+         A_hex[i][j] = sigma() * M_hex[i][j] * c_0 + lambda() * G_hex[i][j];
 			b_hex[i] += nodes[el[f_el_n].node_n[j]].f * M_hex[i][j]; 
 
          Mq1 += M_hex[i][j] * q1[el[f_el_n].node_n[j]];
@@ -520,6 +520,7 @@ void global_A_hex() {
             }
          }
    }
+   // cout << endl;
    // for (int j = 0; j < face_c; j++) cout << faces[j] << endl;
    // cout << "di " << ": ";
    // for (double node : di)
@@ -609,11 +610,17 @@ static void CGM() {
    u.resize(nodes_c);
    for (int i = 0; i < nodes_c; i++) {
       dif[i] = u_a(i, current_t) - q[i];
+
+      if((nodes[i].x == 0.5) && (nodes[i].y == 0.5) && (nodes[i].z == 0.5)) 
+         outdif << current_t << " " << scientific << setprecision(10) << dif[i] << endl;
    }
 
    // double norma_dif = sqrt(scMult(dif, dif));
-   outdif << current_t << " " << scientific << setprecision(10) << dif[13] << endl;
+
+   // outdif << current_t << " " << scientific << setprecision(10) << dif[13] << endl;
+
    // cout << norma_dif << endl;
+
    // outf << norma_dif << " "; //????
    dif.clear();
    u.clear();
