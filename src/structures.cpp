@@ -16,3 +16,5 @@ vector<double> q1, q2, q3;
 vector<double> t;
 int times_c;
 double current_t, t_1, t_2, t_3, c_0, c_1, c_2, c_3; 
+
+vector<int> physical_faces; 

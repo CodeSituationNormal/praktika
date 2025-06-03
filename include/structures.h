@@ -5,13 +5,15 @@
 using namespace std;
 
 struct node {
-   double x, y, z;
    int number;
+   double x, y, z;
    double f;
 };
 struct EL {
-   int node_n[8]{};
    int number;
+   int physical_tag;
+   int elementary_tag;
+   int node_n[8]{};
    double hx = 0, hy = 0, hz = 0;
 };
 
@@ -32,6 +34,9 @@ extern vector<vector<double>> A_loc, M_loc, G_loc;
 extern vector<double> q1, q2, q3;
 extern vector<double> t; 
 extern int times_c;
-extern double current_t, t_1, t_2, t_3, c_0, c_1, c_2, c_3;;
+extern double current_t, t_1, t_2, t_3, c_0, c_1, c_2, c_3;
+
+
+extern vector<int> physical_faces; 
 
 #endif // STRUCTURES_H

@@ -142,3 +142,101 @@ void input_t(int testNumber) {
    
    t_t.close();
 } 
+
+void input_gmsh(const string& filename) {
+   ifstream file(filename);
+   if (!file.is_open()) {
+      cerr << "Error opening file: " << filename << endl;
+      return;
+   }
+
+   string line;
+   bool in_nodes = false;
+   bool in_elements = false;
+
+   while (getline(file, line)) {
+      // Удаляем лишние пробелы в начале/конце строки
+      line.erase(0, line.find_first_not_of(" \t"));
+      line.erase(line.find_last_not_of(" \t") + 1);
+
+      if (line.empty()) continue;
+
+      if (line == "$NOD") {
+         in_nodes = true;
+         in_elements = false;
+         
+         // Читаем количество узлов
+         getline(file, line);
+         int num_nodes = stoi(line);
+         nodes.resize(num_nodes);
+         
+         // Читаем узлы
+         for (int i = 0; i < num_nodes; ++i) {
+            getline(file, line);
+            istringstream iss(line);
+            int id;
+            double x, y, z;
+            iss >> id >> x >> y >> z;
+            nodes[id-1] = {id-1, x, y, z}; // преобразуем к 0-based индексации
+         }
+      }
+      else if (line == "$ENDNOD") {
+         in_nodes = false;
+      }
+      else if (line == "$ELM") {
+         in_elements = true;
+         in_nodes = false;
+         
+         // Читаем количество элементов
+         getline(file, line);
+         int num_elements = stoi(line);
+         // el.resize(num_elements);
+         
+         // Читаем элементы
+         for (int i = 0; i < num_elements; ++i) {
+            getline(file, line);
+            istringstream iss(line);
+            
+            EL elem;
+            int num_nodes;
+            
+            // Формат: номер тип физич_тег элем_тег количество_узлов узлы...
+            int type;
+            iss >> elem.number >> type >> elem.physical_tag >> elem.elementary_tag >> num_nodes;
+            
+            // Читаем узлы элемента
+            for (int j = 0; j < num_nodes; ++j) {
+               int node_id;
+               iss >> node_id;
+               if (j < 8) { // сохраняем только первые 8 узлов (для гексов)
+                  elem.node_n[j] = node_id - 1; // преобразуем к 0-based
+               }
+            }
+               
+            if(type == 5) el.push_back(elem);
+            
+            // Если это поверхностный элемент (тип 3), добавляем в physical_faces
+            if (type == 3) {
+            //   physical_faces.push_back(elem.physical_tag);
+               for (int i = 0; i < 4; i++) {
+                  faces.push_back(elem.node_n[i]);
+               }
+            }
+         }
+      }
+      else if (line == "$ENDELM") {
+         in_elements = false;
+      }
+   }
+
+   file.close();
+
+   nodes_c = nodes.size();
+   el_c = el.size();
+   face_c = faces.size();
+
+   sort(faces.begin(), faces.end());
+   // for (int i = 0; i < face_c; i++) {
+   //    cout << faces[i] << " ";
+   // }
+}
