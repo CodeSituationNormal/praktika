@@ -1,6 +1,7 @@
 #include "common_includes.h"
 
 int t_it = 3;
+bool use_llt;
 ofstream outf, outdif;
 
 double sigma() {
@@ -370,7 +371,6 @@ void GaussJordan(vector<vector<double>> A, vector<vector<double>> alpha, int n) 
    matrix.clear();
 }
 
-
 static void calc_Av(vector<double>& v, vector<double>& res) {
    for (int i = 0; i < nodes_c; i++) {
       res[i] = di[i] * v[i];
@@ -456,12 +456,205 @@ static void CGM() {
 
    cout << norma_dif << endl;
 
-   // outf << norma_dif << " "; //????
    dif.clear();
    u.clear();
 
    // qFile.close();
    r.clear(); z.clear(); Az.clear();
+}
+
+void build_portrait_with_fill_in() {
+   map<int, set<int>> connections;
+   
+   // Инициализация связей из элементов
+   for (int el_idx = 0; el_idx < el_c; ++el_idx) {
+      for (int i = 0; i < 8; ++i) {
+         int node_i = el[el_idx].node_n[i];
+         for (int j = i + 1; j < 8; ++j) {
+               int node_j = el[el_idx].node_n[j];
+               connections[node_i].insert(node_j);
+               connections[node_j].insert(node_i);
+         }
+      }
+   }
+   
+   // Учет fill-in из разложения Холецкого
+   for (int k = 0; k < nodes_c; ++k) {
+      for (auto& i_conn : connections[k]) {
+         if (i_conn > k) {
+               for (auto& j_conn : connections[k]) {
+                  if (j_conn > k && j_conn > i_conn) {
+                     connections[i_conn].insert(j_conn);
+                     connections[j_conn].insert(i_conn);
+                  }
+               }
+         }
+      }
+   }
+   
+   // Построение ig и jg
+   ig.resize(nodes_c + 1, 0);
+   vector<vector<int>> temp_jg(nodes_c);
+   
+   for (int i = 0; i < nodes_c; ++i) {
+      for (auto j : connections[i]) {
+         if (j < i) {
+               temp_jg[i].push_back(j);
+         }
+      }
+      sort(temp_jg[i].begin(), temp_jg[i].end());
+   }
+   
+   ig[0] = 0;
+   for (int i = 0; i < nodes_c; ++i) {
+      ig[i + 1] = ig[i] + temp_jg[i].size();
+      for (auto j : temp_jg[i]) {
+         jg.push_back(j);
+      }
+   }
+}
+
+void LLt() {
+   for (int i = 0; i < nodes_c; ++i) {
+      double sum_diag = 0.0;
+
+      for (int k = ig[i]; k < ig[i + 1]; ++k) {
+         int j = jg[k];
+         double sum = 0.0;
+
+         // Скалярное произведение строк i и j (синхронный проход)
+         int ki = ig[i];
+         int kj = ig[j];
+         while (ki < k && kj < ig[j + 1]) {
+            if (jg[ki] == jg[kj]) {
+               sum += gg[ki] * gg[kj];
+               ++ki; ++kj;
+            }
+            else if (jg[ki] < jg[kj]) {
+               ++ki;
+            }
+            else {
+               ++kj;
+            }
+         }
+
+         gg[k] = (gg[k] - sum) / di[j];
+         sum_diag += gg[k] * gg[k];
+      }
+
+      double diag_val = di[i] - sum_diag;
+      if (diag_val <= 0.0) {
+         cerr << "Ошибка: диагональный элемент <= 0 на строке " << i << endl;
+         exit(1);
+      }
+
+      di[i] = sqrt(diag_val);
+   }
+}
+void LyB() {
+   for (int i = 0; i < nodes_c; ++i) {
+      double sum = 0.0;
+      for (int k = ig[i]; k < ig[i + 1]; ++k) {
+         int j = jg[k];
+         sum += gg[k] * b[j];
+      }
+      b[i] = (b[i] - sum) / di[i];
+   }
+}
+void LtxY() {
+   q = b;
+
+   for (int i = nodes_c - 1; i >= 0; --i) {
+      q[i] /= di[i];
+      for (int k = ig[i]; k < ig[i + 1]; ++k) {
+         int j = jg[k];
+         q[j] -= gg[k] * q[i];
+      }
+   }
+}
+void solve_LLt() {
+   LLt();  
+   LyB();  
+   LtxY();  
+
+   dif.resize(nodes_c);
+   u.resize(nodes_c);
+   for (int i = 0; i < nodes_c; i++) 
+      dif[i] = u_a(i, current_t) - q[i];
+   double norma_dif = sqrt(scMult(dif, dif));
+   cout << norma_dif << endl;
+   outdif << norma_dif << endl;
+
+   u.clear(), dif.clear();
+}
+
+void solve_LLt_stupid() {
+    // Создаем плотную матрицу из разреженной
+    vector<vector<double>> dense_A(nodes_c, vector<double>(nodes_c, 0.0));
+    
+    // Заполняем диагональ
+    for (int i = 0; i < nodes_c; i++) {
+        dense_A[i][i] = di[i];
+    }
+    
+
+    // Заполняем нижний треугольник
+    for (int i = 0; i < nodes_c; i++) {
+        for (int k = ig[i]; k < ig[i+1]; k++) {
+            int j = jg[k];
+            dense_A[i][j] = gg[k];
+            dense_A[j][i] = gg[k]; // Матрица симметричная
+        }
+    }
+    
+    // Разложение Холецкого
+    for (int i = 0; i < nodes_c; i++) {
+        for (int j = 0; j < i; j++) {
+            for (int k = 0; k < j; k++) {
+                dense_A[i][j] -= dense_A[i][k] * dense_A[j][k];
+            }
+            dense_A[i][j] /= dense_A[j][j];
+        }
+        
+        double sum = dense_A[i][i];
+        for (int k = 0; k < i; k++) {
+            sum -= dense_A[i][k] * dense_A[i][k];
+        }
+        dense_A[i][i] = sqrt(sum);
+    }
+    
+    // Решение L*y = b
+    vector<double> y(nodes_c, 0.0);
+    for (int i = 0; i < nodes_c; i++) {
+        double sum = b[i];
+        for (int k = 0; k < i; k++) {
+            sum -= dense_A[i][k] * y[k];
+        }
+        y[i] = sum / dense_A[i][i];
+    }
+    
+    // Решение L^T*x = y
+    q.resize(nodes_c, 0.0);
+    for (int i = nodes_c-1; i >= 0; i--) {
+        double sum = y[i];
+        for (int k = i+1; k < nodes_c; k++) {
+            sum -= dense_A[k][i] * q[k];
+        }
+        q[i] = sum / dense_A[i][i];
+    }
+    
+    // Вычисление невязки
+    dif.resize(nodes_c);
+    u.resize(nodes_c);
+    for (int i = 0; i < nodes_c; i++) {
+        dif[i] = u_a(i, current_t) - q[i];
+    }
+    
+    double norma_dif = sqrt(scMult(dif, dif));
+    cout << norma_dif << endl;
+    
+    dif.clear();
+    u.clear();
 }
 
 void fourth_order_temporal_scheme() {
@@ -482,7 +675,9 @@ void fourth_order_temporal_scheme() {
    
    while(t_it != times_c){
       global_A_hex();
-      CGM();
+
+      if (!use_llt) CGM();
+      else solve_LLt();
 
       outf << current_t << " ";
       for (int i = 0; i < nodes_c; i++){
@@ -498,6 +693,7 @@ void fourth_order_temporal_scheme() {
       gg.clear();
       di.clear();
       b.clear();
+      q.clear();
    }
 }
 
@@ -536,10 +732,13 @@ int main() {
    outf.open("../output/output.txt");
    outdif.open("../output/dif.txt");
 
+   use_llt = true; // Change to true for using LLt method
    format = 2;
 
-   input_all(false); // Change to true for GMSH input and false for built-in input
-   portrait();
+   input_all(true); // Change to true for GMSH input and false for built-in input
+   if (!use_llt) portrait();
+   else build_portrait_with_fill_in();
+
 
    call_functions(false); // Change to true for static case and false for dynamic case
 
