@@ -1,7 +1,8 @@
-void input_nodes(int testNumber);
-void input_el(int testNumber);
-void input_faces(int testNumber);
-void input_el_coef(int testNumber);
-void input_f(int testNumber);
-void input_t(int testNumber);
-void input_gmsh(const string& filename);
+void input_nodes();
+void input_el();
+void input_faces();
+void input_el_coef();
+void input_f();
+void input_t();
+void input_gmsh_1(const string& filename);
+void input_gmsh_2(const string& filename);

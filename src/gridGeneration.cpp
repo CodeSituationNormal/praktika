@@ -124,7 +124,7 @@ void buildGrid() {
    for (const auto& node_num : bc1) {
       // cout << node_num << " ";
       // faces_out << node_num << " " << u_c(nodes[node_num].x, nodes[node_num].y, nodes[node_num].z, 0) << endl;
-      faces_out << node_num << " " << endl;
+      faces_out << node_num << " 1" << endl;
    }
    // cout << endl;
 

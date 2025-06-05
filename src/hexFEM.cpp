@@ -170,7 +170,7 @@ void generate_q123() {
 void generate_bc1() {
    val.resize(face_c);
    for (int i = 0; i < face_c; i++) {
-      val[i] = u_c(nodes[faces[i]].x, nodes[faces[i]].y, nodes[faces[i]].z, current_t);
+      val[i] = u_c(nodes[faces[i].first].x, nodes[faces[i].first].y, nodes[faces[i].first].z, current_t);
    }
 }
 void generate_f() {
@@ -297,7 +297,7 @@ void global_A_hex() {
       b_hex.clear();
    }
    for (int j = 0; j < face_c; j++) {
-      glob_i = faces[j];
+      glob_i = faces[j].first;
       di[glob_i] = 1;
       b[glob_i] = val[j];
       for (int i = ig[glob_i]; i < ig[glob_i + 1]; i++) {
@@ -503,15 +503,20 @@ void fourth_order_temporal_scheme() {
 
 void input_all(bool is_gmsh) {
    if (is_gmsh) {
-      input_gmsh("../input/meshh.msh");
-      input_t(testNumber);
+      if (format == 1) input_gmsh_1("../input/meshh.msh");
+      else if (format == 2) input_gmsh_2("../input/meshh.msh");
+      else {
+         cerr << "Unknown mesh format" << endl;
+         exit(1);
+      }
+      input_t();
    } 
    else {
-      input_nodes(testNumber);
-      input_el(testNumber);
-      input_faces(testNumber);
-      input_el_coef(testNumber);
-      input_t(testNumber);
+      input_nodes();
+      input_el();
+      input_faces();
+      input_el_coef();
+      input_t();
    }
 }
 
@@ -530,9 +535,10 @@ void call_functions(bool is_static) {
 int main() {
    outf.open("../output/output.txt");
    outdif.open("../output/dif.txt");
-   int testNumber = 0;
 
-   input_all(true); // Change to true for GMSH input and false for built-in input
+   format = 2;
+
+   input_all(false); // Change to true for GMSH input and false for built-in input
    portrait();
 
    call_functions(false); // Change to true for static case and false for dynamic case
@@ -542,3 +548,6 @@ int main() {
 
    return 0;
 }
+
+//LU LLt
+//t

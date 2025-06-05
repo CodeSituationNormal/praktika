@@ -23,11 +23,11 @@ extern double x_min, x_max, y_min, y_max, z_min, z_max, t_min, t_max, kx, ky, kz
 extern vector<int> bc1;
 
 
-extern int nodes_c, el_c, face_c, testNumber, maxiter;
+extern int nodes_c, el_c, face_c, physical_names_c, maxiter;
 extern double lam, sig, alpha, beta_beta, norma_pr, eps;
 extern vector <node> nodes;
 extern vector <EL> el;
-extern vector <int> faces, ig, jg;
+extern vector <int> ig, jg;
 extern vector<double> u, dif, di, gg, r, b, q, x, y, z, val, Az, Ar, Mr, b_loc;
 extern vector<vector<double>> A_loc, M_loc, G_loc;
 
@@ -36,7 +36,9 @@ extern vector<double> t;
 extern int times_c;
 extern double current_t, t_1, t_2, t_3, c_0, c_1, c_2, c_3;
 
+extern vector <pair<int, int>> faces; // Node num, tag
+extern vector <pair<int, string>> physical_names; // Physical tag, name
 
-extern vector<int> physical_faces; 
+extern int format;
 
 #endif // STRUCTURES_H
