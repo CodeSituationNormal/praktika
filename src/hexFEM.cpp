@@ -697,7 +697,7 @@ void fourth_order_temporal_scheme() {
    }
 }
 
-void input_all(bool is_gmsh) {
+void input_all(bool is_gmsh, int format) {
    if (is_gmsh) {
       if (format == 1) input_gmsh_1("../input/meshh.msh");
       else if (format == 2) input_gmsh_2("../input/meshh.msh");
@@ -732,10 +732,17 @@ int main() {
    outf.open("../output/output.txt");
    outdif.open("../output/dif.txt");
 
-   use_llt = true; // Change to true for using LLt method
-   format = 2;
+   bool use_gmsh_input;
+   ifstream settings("../input/settings.txt");
+   settings >> use_gmsh_input >> use_llt >> format;
+   settings.close();
 
-   input_all(true); // Change to true for GMSH input and false for built-in input
+   cout << "Using GMSH input: " << use_gmsh_input << endl;
+   cout << "Using LLt method: " << use_llt << endl;
+   if (use_gmsh_input) cout << "Format: " << format << endl;
+
+
+   input_all(use_gmsh_input, format); // Change to true for GMSH input and false for built-in input
    if (!use_llt) portrait();
    else build_portrait_with_fill_in();
 

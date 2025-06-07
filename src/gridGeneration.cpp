@@ -2,13 +2,13 @@
 
 
 ofstream nodes_out, elements_out, faces_out, time_out; //- f_out
+bool gmsh_input;
 
 void buildGrid() {
    nodes_out.open("../processFiles/nodes_out.txt");
    elements_out.open("../processFiles/elements_out.txt");
    // f_out.open("../f.txt");
    faces_out.open("../processFiles/faces.txt");
-   time_out.open("../processFiles/time.txt");
 
    vector<double> x_coords(nx);
    vector<double> y_coords(ny);
@@ -69,24 +69,24 @@ void buildGrid() {
       }
    }
 
-   if (kt == 1.0) {
-      double ht = (t_max - t_min) / (nt - 1);
-      for (int j = 0; j < nt; ++j)
-         t[j] = t_min + j * ht;
-   }
-   else {
-      sum = (1.0 - pow(kt, nt - 1)) / (1.0 - kt);
-      double ht = (t_max - t_min) / sum;
-      t[0] = t_min;
-      for (int j = 1; j < nt; ++j)
-         t[j] = t[j - 1] + ht * pow(kt, j - 1);
-   }
+   // if (kt == 1.0) {
+   //    double ht = (t_max - t_min) / (nt - 1);
+   //    for (int j = 0; j < nt; ++j)
+   //       t[j] = t_min + j * ht;
+   // }
+   // else {
+   //    sum = (1.0 - pow(kt, nt - 1)) / (1.0 - kt);
+   //    double ht = (t_max - t_min) / sum;
+   //    t[0] = t_min;
+   //    for (int j = 1; j < nt; ++j)
+   //       t[j] = t[j - 1] + ht * pow(kt, j - 1);
+   // }
 
 
-   time_out << scientific << setprecision(10) << t_min << endl;
-   for (int j = 1; j < nt; ++j) {
-      time_out << scientific << setprecision(10) << t[j] << endl;
-   }
+   // time_out << scientific << setprecision(10) << t_min << endl;
+   // for (int j = 1; j < nt; ++j) {
+   //    time_out << scientific << setprecision(10) << t[j] << endl;
+   // }
    
    int n_xy = nx * ny;
    // cout << "Elements grid:" << endl;
@@ -132,11 +132,41 @@ void buildGrid() {
    elements_out.close();
    // f_out.close();
    faces_out.close();
+}
+
+void generate_t() {
+   time_out.open("../processFiles/time.txt");
+   double sum;
+
+   if (kt == 1.0) {
+      double ht = (t_max - t_min) / (nt - 1);
+      for (int j = 0; j < nt; ++j)
+         t[j] = t_min + j * ht;
+   }
+   else {
+      sum = (1.0 - pow(kt, nt - 1)) / (1.0 - kt);
+      double ht = (t_max - t_min) / sum;
+      t[0] = t_min;
+      for (int j = 1; j < nt; ++j)
+         t[j] = t[j - 1] + ht * pow(kt, j - 1);
+   }
+
+
+   time_out << scientific << setprecision(10) << t_min << endl;
+   for (int j = 1; j < nt; ++j) {
+      time_out << scientific << setprecision(10) << t[j] << endl;
+   }
+
    time_out.close();
 }
+
 void input() {
    ifstream inputGrid("../input/grid.txt");
    ifstream inputNodes("../input/nodes.txt");
+   ifstream inputSettings("../input/settings.txt");
+
+   inputSettings >> gmsh_input;
+   inputSettings.close();
 
    if (!inputGrid.is_open() || !inputNodes.is_open()) {
       cerr << "Unable to open input files." << endl;
@@ -145,12 +175,15 @@ void input() {
 
    inputGrid >> x_min >> x_max >>y_min>>y_max>>z_min>>z_max>> t_min >> t_max;
    inputNodes >> nx >>ny>>nz>> nt >> kx >>ky>>kz>> kt;
-   t.resize(nt);
-
-   buildGrid();
 
    inputGrid.close();
    inputNodes.close();
+
+   t.resize(nt);
+
+   if (!gmsh_input) buildGrid();
+   generate_t();
+
 
    nodes.clear();
    el.clear();
