@@ -139,13 +139,14 @@ void generate_t() {
    double sum;
 
    if (kt == 1.0) {
-      double ht = (t_max - t_min) / (nt - 1);
+      ht = (t_max - t_min) / (nt - 1);
       for (int j = 0; j < nt; ++j)
          t[j] = t_min + j * ht;
    }
    else {
       sum = (1.0 - pow(kt, nt - 1)) / (1.0 - kt);
-      double ht = (t_max - t_min) / sum;
+      ht = (t_max - t_min) / sum;
+      cout << "ht = " << ht << endl;
       t[0] = t_min;
       for (int j = 1; j < nt; ++j)
          t[j] = t[j - 1] + ht * pow(kt, j - 1);

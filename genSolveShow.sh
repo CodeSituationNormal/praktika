@@ -46,6 +46,6 @@ fi
 
 ./solve.exe
 cd ..
-if [ "$gmshh" = false ]; then
+if [ "$gmshh" = 0 ]; then
    python 3DGrid.py
 fi

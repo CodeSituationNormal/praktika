@@ -1,8 +1,14 @@
-#include "common_includes.h"
+#include "../include/common_includes.h"
+#include <chrono>
+using namespace std::chrono;
 
 int t_it = 3;
 bool use_llt;
-ofstream outf, outdif;
+ofstream outf, outdif, out_act, out_dif_act;
+vector <double> t_grid, di_prev, gg_prev, q_act;
+vector <vector<double>> qs;
+double current_h;
+bool transformation = false;
 
 double sigma() {
    return 1;
@@ -158,14 +164,29 @@ void generate_q123() {
    q2.resize(nodes_c);
    q3.resize(nodes_c);
    for (int i = 0; i < nodes_c; i++) {
-      q1[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t[2]);
-      q2[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t[1]);
-      q3[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t[0]);
+      if (use_llt) {
+         q1[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t_grid[2]);
+         q2[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t_grid[1]);
+         q3[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t_grid[0]); 
+      }
+      else {
+         q1[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t[2]);
+         q2[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t[1]);
+         q3[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t[0]); 
+      }
    }
-   current_t = t[3];
-   t_1 = t[2];
-   t_2 = t[1];
-   t_3 = t[0];
+   if (use_llt) {
+      current_t = t_grid[3];
+      t_1 = t_grid[2];
+      t_2 = t_grid[1];
+      t_3 = t_grid[0];
+   }
+   else {
+      current_t = t[3];
+      t_1 = t[2];
+      t_2 = t[1];
+      t_3 = t[0];
+   }
 }
 
 void generate_bc1() {
@@ -194,13 +215,6 @@ void portrait() {
          }
       }
    }
-   
-   // for (size_t i = 0; i < list.size(); ++i) {
-   //    cout << "Node " << i << ": ";
-   //    for (int node : list[i]) 
-   //       cout << node << " ";
-   //    cout << endl;
-   // }
    int k = 0;
    ig.push_back(0);
    for (int i = 0; i < nodes_c; i++) {
@@ -213,20 +227,69 @@ void portrait() {
       }
       ig.push_back(ig.back() + k);
    }
-   // cout << "jg " << ": ";
-   // for (int node : jg) {
-   //    cout << node << " ";
-   // }
-   // cout << endl;
-   // cout << "ig " << ": ";
-   // for (int node : ig) {
-   //    cout << node << " ";
-   // }
-   // cout << endl;
 }
 void calc_c() {
-   double t0 = current_t, t1 = t[t_it - 1], t2 = t[t_it - 2], t3 = t[t_it - 3], d01, d02, d03, d12, d13, d23, t0p2;
+   current_t = t_grid[t_it];
+   double t0 = current_t, t1 = t_grid[t_it - 1], t2 = t_grid[t_it - 2], t3 = t_grid[t_it - 3], d01, d02, d03, d12, d13, d23, t0p2;
+   double ht_new = current_t - t1, ht_old = t1 - t2, ht_old2 = t2 - t3;
+   
+   t2 = t_grid[t_it - 2], t3 = t_grid[t_it - 3];
 
+   if (((t0 - t1 != t1 - t2)) && use_llt) {
+      transformation = true;
+      double ht_new = t0 - t1; // Новый шаг времени
+      t0 = current_t, t1 = t_grid[t_it - 1], t2 = t1- ht_new, t3 = t2 - ht_new;
+   }
+   else {
+      transformation = false;
+      t2 = t1 - ht_new, t3 = t2 - ht_new;
+   }
+
+   double q2index, q3index;
+   if (ht_new / ht_old != 1) {
+
+      q2index = ht_new / ht_old + 1;
+      if (ht_new / ht_old2 != 1)
+         q3index = q2index + (t_grid[t_it - 1] - t_grid[t_it - q2index]) / (t_grid[t_it - q2index] - t_grid[t_it - q2index - 1]);
+   }
+   else {
+      q2index = 2;
+      if (ht_new / ht_old2 != 1) 
+         q3index = q2index + (t_grid[t_it - 1] - t_grid[t_it - q2index]) / (t_grid[t_it - q2index]- t_grid[t_it - q2index-1]);
+      else q3index = 3;
+   }
+
+   for (int i = 0; i < nodes_c; i++) {
+      q3[i] = qs[t_it - q3index][i];
+      q2[i] = qs[t_it - q2index][i];
+   }
+
+   d01 = t0 - t1;
+   d02 = t0 - t2;
+   d03 = t0 - t3;
+   d12 = t1 - t2;
+   d13 = t1 - t3;
+   d23 = t2 - t3;
+
+   t0p2 = t0 * t0;
+
+   // cout << " times " << t0 << " " << t1 << " " << t2 << " " << t3 << endl;
+
+   c_0 = (3 * t0p2 - 2 * t0 * (t1 + t2 + t3) + (t1 * t2) + (t1 * t3) + (t2 * t3)) / (d01 * d02 * d03);
+   // cout << "nu0: " << c_0 << endl;
+
+   c_1 = (t0p2 - t0 * t2 - t3 * t0 + t3 * t2) / (d13 * d12 * (-d01));
+   // cout <<"nu1: " << c_1 << endl;
+
+   c_2 = (t0p2 - t1 * t0 - t3 * t0 + t3 * t1) / (d23 * (-d12) * (-d02));
+   // cout << "nu2: " << c_2 << endl;
+
+   c_3 = (t0p2 - t1 * t0 - t2 * t0 + t2 * t1) / ((-d23) * (-d13) * (-d03));
+   // cout << "nu3: " << c_3 << endl;
+}
+void calc_c_normal() {
+   double t0 = current_t, t1 = t[t_it - 1], t2 = t[t_it - 2], t3 = t[t_it - 3], d01, d02, d03, d12, d13, d23, t0p2;
+   
    d01 = t0 - t1;
    d02 = t0 - t2;
    d03 = t0 - t3;
@@ -272,11 +335,8 @@ void global_A_hex() {
    gg.resize(ig[nodes_c], 0);
    b.resize(nodes_c, 0);
 
-   // Should be generated every time step
    generate_bc1();
    generate_f();
-
-   calc_c();
 
    for (int k = 0; k < el_c; k++) {
       loc_hex(k);
@@ -297,6 +357,7 @@ void global_A_hex() {
       G_hex.clear();
       b_hex.clear();
    }
+
    for (int j = 0; j < face_c; j++) {
       glob_i = faces[j].first;
       di[glob_i] = 1;
@@ -313,20 +374,6 @@ void global_A_hex() {
             }
          }
    }
-   // cout << endl;
-   // for (int j = 0; j < face_c; j++) cout << faces[j] << endl;
-   // cout << "di " << ": ";
-   // for (double node : di)
-   //    cout << node << " ";
-   // cout << "gg " << ": ";
-   // for (double node : gg)
-   //    cout << node << " ";
-   // cout << endl;
-   // cout << "b " << ": ";
-   // for (double node : b)
-   //    cout << node << " ";
-   // cout << endl;
-
    val.clear();
 }
 
@@ -514,7 +561,73 @@ void build_portrait_with_fill_in() {
    }
 }
 
+/**
+ * @brief Generates a piecewise constant grid based on the given magnification factor.
+ *
+ * This function creates and returns a vector of doubles representing a grid where
+ * each segment is constant within its interval. The granularity or resolution of the grid
+ * is determined by the provided magnification_factor.
+ *
+ * @param magnification_factor An integer specifying how much to refine or magnify the grid.
+ *        Higher values result in a finer grid with more segments.
+ * @return std::vector<double> A vector containing the values of the piecewise constant grid.
+ */
+vector<double> generate_piecewise_constant_grid(int magnification_factor) {
+   vector<double> t_grid;
+
+   // Проверка на пустую входную сетку
+   if (t.empty()) {
+      cerr << "Error: Input uneven grid is empty!" << endl;
+      return t_grid;
+   }
+
+   // Начальная точка
+   t_grid.push_back(t[0]);
+   ht = 0.25;
+   double current_ht = ht; // Начальный шаг по времени
+   double t0 = t[0];
+
+   // Проход по всем интервалам неравномерной сетки
+   for (size_t i = 1; i < t.size(); ++i) {
+      double interval_length = t[i] - t[i - 1];
+
+      // Если интервал достаточно большой, разбиваем его на мелкие шаги
+      if (interval_length > current_ht * magnification_factor) {
+         int steps = static_cast<int>(t[i] - t0) / current_ht;
+
+         // Добавляем точки с текущим шагом
+         for (int j = 1; j <= steps; ++j) {
+            double new_point = t0 + j * current_ht;
+            t_grid.push_back(new_point);
+    
+         }
+
+         // Увеличиваем шаг для следующего интервала
+         current_ht *= magnification_factor;
+         t0 = *(--t_grid.end());
+      }
+      // Если интервал маленький, добавляем только конечную точку
+    
+   }
+
+   for (t0 = t0 + current_ht; t0 <= t_max; t0 = t0 + current_ht){
+      t_grid.push_back(t0);
+   }
+   // if (t_grid.back() < t_max) {
+   //    t_grid.push_back(t_max); // Добавляем конечную точку, если она не была добавлена
+   // }
+   // Вывод результата (можно убрать в финальной версии)
+   cout << "Generated piecewise-constant grid:\n";
+   for (const auto& point : t_grid) {
+      cout << point << " ";
+   }
+   cout << endl;
+
+   return t_grid;
+}
+
 void LLt() {
+   // cout << "LLt" << endl;
    for (int i = 0; i < nodes_c; ++i) {
       double sum_diag = 0.0;
 
@@ -544,7 +657,7 @@ void LLt() {
 
       double diag_val = di[i] - sum_diag;
       if (diag_val <= 0.0) {
-         cerr << "Ошибка: диагональный элемент <= 0 на строке " << i << endl;
+         cerr << "Error: diagonal element is <= 0 on the line " << i << endl;
          exit(1);
       }
 
@@ -556,145 +669,178 @@ void LyB() {
       double sum = 0.0;
       for (int k = ig[i]; k < ig[i + 1]; ++k) {
          int j = jg[k];
-         sum += gg[k] * b[j];
+         sum += gg_prev[k] * b[j];
       }
-      b[i] = (b[i] - sum) / di[i];
+      b[i] = (b[i] - sum) / di_prev[i];
    }
 }
 void LtxY() {
    q = b;
 
    for (int i = nodes_c - 1; i >= 0; --i) {
-      q[i] /= di[i];
+      q[i] /= di_prev[i];
       for (int k = ig[i]; k < ig[i + 1]; ++k) {
          int j = jg[k];
-         q[j] -= gg[k] * q[i];
+         q[j] -= gg_prev[k] * q[i];
       }
    }
 }
 void solve_LLt() {
-   LLt();  
+   // double eps_step = 1e-15; // Tolerance for step
+   if (transformation || t_it == 3){
+      // current_h = current_t - t_1;
+      LLt();
+      // di_prev.resize(nodes_c);
+      // gg_prev.resize(ig[nodes_c]);
+      di_prev = di;
+      gg_prev = gg;
+   }
    LyB();  
-   LtxY();  
+   LtxY(); 
 
-   dif.resize(nodes_c);
-   u.resize(nodes_c);
-   for (int i = 0; i < nodes_c; i++) 
-      dif[i] = u_a(i, current_t) - q[i];
-   double norma_dif = sqrt(scMult(dif, dif));
-   cout << norma_dif << endl;
-   outdif << norma_dif << endl;
+   // dif.resize(nodes_c);
+   // u.resize(nodes_c);
+   // for (int i = 0; i < nodes_c; i++) 
+   //    dif[i] = u_a(i, current_t) - q[i];
+   // double norma_dif = sqrt(scMult(dif, dif));
+   // cout << norma_dif << endl;
+   // outdif << norma_dif << endl;
 
-   u.clear(), dif.clear();
+   // u.clear(), dif.clear();
 }
 
-void solve_LLt_stupid() {
-    // Создаем плотную матрицу из разреженной
-    vector<vector<double>> dense_A(nodes_c, vector<double>(nodes_c, 0.0));
-    
-    // Заполняем диагональ
-    for (int i = 0; i < nodes_c; i++) {
-        dense_A[i][i] = di[i];
-    }
-    
+void calc_eta(double cur_t, int ind) {
+   double t0 = t_grid[ind], t1 = t_grid[ind - 1], t2 = t_grid[ind - 2], t3 = t_grid[ind - 3];
+   
+   double dj = cur_t - t0, dj_1 = cur_t - t1, dj_2 = cur_t - t2, dj_3 = cur_t - t3;
+   eta_0 = (dj_3 * dj_2 * dj_1) / ((t0 - t3) * (t0 - t2) * (t0 - t1));
+   // cout << "eta_0 " << eta_0 << endl;
+   eta_1 = (dj_3*dj_2*dj) / ((t1 - t3) * (t1 - t2) * (t1 - t0));
+   // cout << "eta_1 " << eta_1 << endl;
+   eta_2 = (dj_3 * dj_1 * dj) / ((t2 - t3) * (t2 - t1) * (t2 - t0));
+   // cout << "eta_2 " << eta_2 << endl;
+   eta_3 = (dj_2 * dj_1 * dj) / ((t3 - t2) * (t3 - t1) * (t3 - t0));
+   // cout << "eta_3 " << eta_3 << endl;
+}
+int find_time_interval(double t_new) {
+   for (int i = 0; i < t_grid.size(); ++i) {
+      if (t_new >= t_grid[i] && t_new < t_grid[i + 1]) {
+         return i + 1;
+      }
+   }
+   return -1; 
+}
+void u_actual() {
+   use_llt = false;
+   out_act.open("../output/q_act.txt");
+   out_dif_act.open("../output/dif_act.txt");
+   int ind;
+   dif.resize(nodes_c);
+   q_act.resize(nodes_c);
+   vector <double> u_num(nodes_c, 0);
 
-    // Заполняем нижний треугольник
-    for (int i = 0; i < nodes_c; i++) {
-        for (int k = ig[i]; k < ig[i+1]; k++) {
-            int j = jg[k];
-            dense_A[i][j] = gg[k];
-            dense_A[j][i] = gg[k]; // Матрица симметричная
-        }
-    }
-    
-    // Разложение Холецкого
-    for (int i = 0; i < nodes_c; i++) {
-        for (int j = 0; j < i; j++) {
-            for (int k = 0; k < j; k++) {
-                dense_A[i][j] -= dense_A[i][k] * dense_A[j][k];
-            }
-            dense_A[i][j] /= dense_A[j][j];
-        }
-        
-        double sum = dense_A[i][i];
-        for (int k = 0; k < i; k++) {
-            sum -= dense_A[i][k] * dense_A[i][k];
-        }
-        dense_A[i][i] = sqrt(sum);
-    }
-    
-    // Решение L*y = b
-    vector<double> y(nodes_c, 0.0);
-    for (int i = 0; i < nodes_c; i++) {
-        double sum = b[i];
-        for (int k = 0; k < i; k++) {
-            sum -= dense_A[i][k] * y[k];
-        }
-        y[i] = sum / dense_A[i][i];
-    }
-    
-    // Решение L^T*x = y
-    q.resize(nodes_c, 0.0);
-    for (int i = nodes_c-1; i >= 0; i--) {
-        double sum = y[i];
-        for (int k = i+1; k < nodes_c; k++) {
-            sum -= dense_A[k][i] * q[k];
-        }
-        q[i] = sum / dense_A[i][i];
-    }
-    
-    // Вычисление невязки
-    dif.resize(nodes_c);
-    u.resize(nodes_c);
-    for (int i = 0; i < nodes_c; i++) {
-        dif[i] = u_a(i, current_t) - q[i];
-    }
-    
-    double norma_dif = sqrt(scMult(dif, dif));
-    cout << norma_dif << endl;
-    
-    dif.clear();
-    u.clear();
+   generate_q123();
+
+   for (t_it = 3; t_it < t.size() - 1; t_it++) {
+      ind = find_time_interval(t[t_it]);
+      if (ind == -1) cerr << "Error: time interval not found" << endl;
+      calc_eta(t[t_it],ind);
+      for (int j = 0; j < nodes_c; j++) {
+         q_act[j] = eta_3 * qs[ind - 3][j] + eta_2 * qs[ind - 2][j] + eta_1 * qs[ind - 1][j] + eta_0 * qs[ind][j];
+         out_act << scientific << setprecision(10) << q_act[j] << " ";
+         dif[j] = u_a(j, t[t_it]) - q_act[j];
+         out_dif_act << scientific << setprecision(10) << dif[j] << " ";
+      }
+      out_act << endl;
+      out_dif_act << endl;
+      dif.clear();
+      dif.resize(nodes_c);
+      q_act.clear();
+      q_act.resize(nodes_c);
+   }
+
+   for (int j = 0; j < nodes_c; j++) {
+      q_act[j] = qs[qs.size() - 1][j];
+      out_act << scientific << setprecision(10) << q_act[j] << " ";
+      dif[j] = u_a(j, t[t_it]) - q[j];
+      out_dif_act << scientific << setprecision(10) << dif[j] << " ";
+   }
+
+   out_act.close();
+   out_dif_act.close();
 }
 
 void fourth_order_temporal_scheme() {
-   generate_q123();
+   dif.resize(nodes_c);
+   u.resize(nodes_c);
+   if(use_llt) t_grid = generate_piecewise_constant_grid(2); // 2 - magnification factor
+   else t_grid = t;
+   times_c = t_grid.size();
 
-   outf << scientific << setprecision(10) << t[0] << " ";
+   // cout << "Fourth order temporal scheme with " << times_c << " time steps." << endl;
+
+   generate_q123();
+   qs.push_back(q3), qs.push_back(q2), qs.push_back(q1);
+   q.resize(nodes_c);
+   q1.resize(nodes_c);
+   q2.resize(nodes_c);
+   q3.resize(nodes_c);
+
+   outf << scientific << setprecision(10) << t_grid[0] << " ";
    for (int i = 0; i < nodes_c; i++)
       outf << scientific << setprecision(10) << q3[i] << " ";
    outf << endl;
-   outf << t[1] << " ";
+   outf << t_grid[1] << " ";
    for (int i = 0; i < nodes_c; i++)
       outf << scientific << setprecision(10) << q2[i] << " ";
    outf << endl;
-   outf << t[2] << " ";
+   outf << t_grid[2] << " ";
    for (int i = 0; i < nodes_c; i++)
       outf << scientific << setprecision(10) << q1[i] << " ";
    outf << endl;
    
+   vector<duration<double, milli>> durations;
    while(t_it != times_c){
+      if (use_llt) calc_c();
+      else calc_c_normal();
       global_A_hex();
+
+      duration<double, milli> duration(0);
+      auto start = high_resolution_clock::now();
 
       if (!use_llt) CGM();
       else solve_LLt();
 
+      auto end = high_resolution_clock::now();
+      duration = end - start;
+      durations.push_back(duration);
+
       outf << current_t << " ";
+      qs.push_back(q);
       for (int i = 0; i < nodes_c; i++){
          outf << scientific << setprecision(10) << q[i] << " ";
-         q3[i] = q2[i]; 
-         q2[i] = q1[i];
-         q1[i] = q[i];
       }
       outf << endl;
 
+      for (int i = 0; i < nodes_c; i++){
+         q3[i] = q2[i];
+         q2[i] = q1[i];
+         q1[i] = q[i];
+      }
+
       t_it++;
-      current_t = t[t_it];
+      current_t = t_grid[t_it];
       gg.clear();
       di.clear();
       b.clear();
       q.clear();
    }
+
+   double total_time = 0;
+   for (int i = 0; i < durations.size(); i++) {
+      total_time += durations[i].count();
+   }
+   cout << "Total time: " << total_time << " ms" << endl;
 }
 
 void input_all(bool is_gmsh, int format) {
@@ -725,6 +871,7 @@ void call_functions(bool is_static) {
    }
    else {
       fourth_order_temporal_scheme();
+      if (use_llt) u_actual();
    }
 }
 
@@ -743,9 +890,11 @@ int main() {
 
 
    input_all(use_gmsh_input, format); // Change to true for GMSH input and false for built-in input
+   cout << "Input completed." << endl;
    if (!use_llt) portrait();
    else build_portrait_with_fill_in();
 
+   cout << "Portrait completed." << endl;
 
    call_functions(false); // Change to true for static case and false for dynamic case
 
@@ -754,6 +903,3 @@ int main() {
 
    return 0;
 }
-
-//LU LLt
-//t

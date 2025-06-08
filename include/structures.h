@@ -34,7 +34,7 @@ extern vector<vector<double>> A_loc, M_loc, G_loc;
 extern vector<double> q1, q2, q3;
 extern vector<double> t; 
 extern int times_c;
-extern double current_t, t_1, t_2, t_3, c_0, c_1, c_2, c_3;
+extern double current_t, t_1, t_2, t_3, c_0, c_1, c_2, c_3, eta_0, eta_1, eta_2, eta_3;
 
 extern vector <pair<int, int>> faces; // Node num, tag
 extern vector <pair<int, string>> physical_names; // Physical tag, name

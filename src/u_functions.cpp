@@ -2,16 +2,16 @@
 
 double u_a(int i, double t) {
    // u[i] = nodes[i].x * nodes[i].x; // modify manually if needed
-   u[i] = nodes[i].x; // modify manually if needed
+   u[i] = t; // modify manually if needed
    return u[i];
 }
 
 double u_c(double x, double y, double z, double t) {
-   return x; // modify manually if needed
+   return t; // modify manually if needed
 }
 
 double f_auto(double x, double y, double z, double t) {
-   return 0; // modify manually if needed
+   return 1; // modify manually if needed
 }
 
 void dif_u() {
