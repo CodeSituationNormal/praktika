@@ -9,6 +9,14 @@ vector <double> t_grid, di_prev, gg_prev, q_act;
 vector <vector<double>> qs;
 double current_h;
 bool transformation = false;
+bool piece_const_flag = true;
+
+vector <double> dif_shod_t; // kill
+static double scMultDIF(vector<double>& x, vector<double>& y) {
+   double res = 0;
+   for (int i = 0; i < x.size(); i++) res += x[i] * y[i];
+   return res;
+}
 
 double sigma() {
    return 1;
@@ -164,7 +172,7 @@ void generate_q123() {
    q2.resize(nodes_c);
    q3.resize(nodes_c);
    for (int i = 0; i < nodes_c; i++) {
-      if (use_llt) {
+      if (use_llt || piece_const_flag) {
          q1[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t_grid[2]);
          q2[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t_grid[1]);
          q3[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t_grid[0]); 
@@ -175,7 +183,7 @@ void generate_q123() {
          q3[i] = u_c(nodes[i].x, nodes[i].y, nodes[i].z, t[0]); 
       }
    }
-   if (use_llt) {
+   if (use_llt || piece_const_flag) {
       current_t = t_grid[3];
       t_1 = t_grid[2];
       t_2 = t_grid[1];
@@ -235,7 +243,7 @@ void calc_c() {
    
    t2 = t_grid[t_it - 2], t3 = t_grid[t_it - 3];
 
-   if (((t0 - t1 != t1 - t2)) && use_llt) {
+   if (((t0 - t1 != t1 - t2)) && (use_llt || piece_const_flag)) {
       transformation = true;
       double ht_new = t0 - t1; // Новый шаг времени
       t0 = current_t, t1 = t_grid[t_it - 1], t2 = t1- ht_new, t3 = t2 - ht_new;
@@ -489,19 +497,18 @@ static void CGM() {
    u.resize(nodes_c);
    for (int i = 0; i < nodes_c; i++) {
       dif[i] = u_a(i, current_t) - q[i];
-
       // if((nodes[i].x == 0) && (nodes[i].y == 0) && (nodes[i].z == 1.5)) 
       //    outdif << current_t << " " << scientific << setprecision(10) << dif[i] << endl;
 
       // if(i == 111) 
          // outdif << current_t << " " << scientific << setprecision(10) << dif[i] << endl;
    }
-
    double norma_dif = sqrt(scMult(dif, dif));
 
    // outdif << current_t << " " << scientific << setprecision(10) << dif[13] << endl;
-
-   cout << norma_dif << endl;
+   // cout << scientific << setprecision(10) << current_t << "q " << q[q.size() - 1] << " dif act " << dif[dif.size() - 1] << endl;
+   // dif_shod_t.push_back(dif[dif.size() - 1]);
+   // cout << norma_dif << endl;
 
    dif.clear();
    u.clear();
@@ -511,67 +518,46 @@ static void CGM() {
 }
 
 void build_portrait_with_fill_in() {
-   map<int, set<int>> connections;
-   
-   // Инициализация связей из элементов
-   for (int el_idx = 0; el_idx < el_c; ++el_idx) {
-      for (int i = 0; i < 8; ++i) {
-         int node_i = el[el_idx].node_n[i];
-         for (int j = i + 1; j < 8; ++j) {
-               int node_j = el[el_idx].node_n[j];
-               connections[node_i].insert(node_j);
-               connections[node_j].insert(node_i);
-         }
-      }
-   }
-   
-   // Учет fill-in из разложения Холецкого
-   for (int k = 0; k < nodes_c; ++k) {
-      for (auto& i_conn : connections[k]) {
-         if (i_conn > k) {
-               for (auto& j_conn : connections[k]) {
-                  if (j_conn > k && j_conn > i_conn) {
-                     connections[i_conn].insert(j_conn);
-                     connections[j_conn].insert(i_conn);
-                  }
-               }
-         }
-      }
-   }
-   
-   // Построение ig и jg
-   ig.resize(nodes_c + 1, 0);
-   vector<vector<int>> temp_jg(nodes_c);
-   
-   for (int i = 0; i < nodes_c; ++i) {
-      for (auto j : connections[i]) {
-         if (j < i) {
-               temp_jg[i].push_back(j);
-         }
-      }
-      sort(temp_jg[i].begin(), temp_jg[i].end());
-   }
-   
-   ig[0] = 0;
-   for (int i = 0; i < nodes_c; ++i) {
-      ig[i + 1] = ig[i] + temp_jg[i].size();
-      for (auto j : temp_jg[i]) {
-         jg.push_back(j);
-      }
-   }
+    vector<set<int>> connections(nodes_c);
+
+    // Связи от элементов
+    for (int el_idx = 0; el_idx < el_c; ++el_idx) {
+        for (int i = 0; i < 8; ++i) {
+            int node_i = el[el_idx].node_n[i];
+            for (int j = i + 1; j < 8; ++j) {
+                int node_j = el[el_idx].node_n[j];
+                connections[node_i].insert(node_j);
+                connections[node_j].insert(node_i);
+            }
+        }
+    }
+
+    // Fill-in
+    for (int k = 0; k < nodes_c; ++k) {
+        const auto& neighbors = connections[k];
+        for (auto it1 = neighbors.upper_bound(k); it1 != neighbors.end(); ++it1) {
+            for (auto it2 = next(it1); it2 != neighbors.end(); ++it2) {
+                connections[*it1].insert(*it2);
+                connections[*it2].insert(*it1);
+            }
+        }
+    }
+
+    // Построение ig и jg
+    ig.resize(nodes_c + 1);
+    ig[0] = 0;
+    for (int i = 0; i < nodes_c; ++i) {
+        for (int j : connections[i]) {
+            if (j < i) jg.push_back(j);
+        }
+        ig[i + 1] = jg.size();
+    }
+
+    di.resize(nodes_c, 0);
+    gg.resize(jg.size(), 0);
+    b.resize(nodes_c, 0);
 }
 
-/**
- * @brief Generates a piecewise constant grid based on the given magnification factor.
- *
- * This function creates and returns a vector of doubles representing a grid where
- * each segment is constant within its interval. The granularity or resolution of the grid
- * is determined by the provided magnification_factor.
- *
- * @param magnification_factor An integer specifying how much to refine or magnify the grid.
- *        Higher values result in a finer grid with more segments.
- * @return std::vector<double> A vector containing the values of the piecewise constant grid.
- */
 vector<double> generate_piecewise_constant_grid(int magnification_factor) {
    vector<double> t_grid;
 
@@ -593,7 +579,7 @@ vector<double> generate_piecewise_constant_grid(int magnification_factor) {
 
       // Если интервал достаточно большой, разбиваем его на мелкие шаги
       if (interval_length > current_ht * magnification_factor) {
-         int steps = static_cast<int>(t[i] - t0) / current_ht;
+         int steps = static_cast<int>((t[i] - t0) / current_ht);
 
          // Добавляем точки с текущим шагом
          for (int j = 1; j <= steps; ++j) {
@@ -607,14 +593,25 @@ vector<double> generate_piecewise_constant_grid(int magnification_factor) {
          t0 = *(--t_grid.end());
       }
       // Если интервал маленький, добавляем только конечную точку
-    
    }
+      // double t_grid_max = t_grid[t_grid.size() - 1] + current_ht / magnification_factor;
+      // t_grid.push_back(t_grid_max); 
 
-   for (t0 = t0 + current_ht; t0 <= t_max; t0 = t0 + current_ht){
+   for (t0 = t0 + current_ht; t0 <= t_max + current_ht; t0 = t0 + current_ht){
       t_grid.push_back(t0);
    }
+
+
+
+   // double t_grid_max = t_grid[t_grid.size() - 1] + current_ht / magnification_factor;
+   // t_grid.push_back(t_grid_max); 
    // if (t_grid.back() < t_max) {
-   //    t_grid.push_back(t_max); // Добавляем конечную точку, если она не была добавлена
+   //    double t_grid_max = t_grid[t_grid.size() - 1] + current_ht / magnification_factor;
+   //    t_grid.push_back(t_grid_max); 
+   // }
+   // else {
+   //    double t_grid_max = t_grid[t_grid.size() - 1] + current_ht / magnification_factor;
+   //    t_grid.push_back(t_grid_max); 
    // }
    // Вывод результата (можно убрать в финальной версии)
    cout << "Generated piecewise-constant grid:\n";
@@ -732,6 +729,7 @@ int find_time_interval(double t_new) {
 }
 void u_actual() {
    use_llt = false;
+   piece_const_flag = false;
    out_act.open("../output/q_act.txt");
    out_dif_act.open("../output/dif_act.txt");
    int ind;
@@ -741,29 +739,32 @@ void u_actual() {
 
    generate_q123();
 
-   for (t_it = 3; t_it < t.size() - 1; t_it++) {
+   for (t_it = 3; t_it < t.size(); t_it++) { //!!!
       ind = find_time_interval(t[t_it]);
       if (ind == -1) cerr << "Error: time interval not found" << endl;
       calc_eta(t[t_it],ind);
       for (int j = 0; j < nodes_c; j++) {
-         q_act[j] = eta_3 * qs[ind - 3][j] + eta_2 * qs[ind - 2][j] + eta_1 * qs[ind - 1][j] + eta_0 * qs[ind][j];
-         out_act << scientific << setprecision(10) << q_act[j] << " ";
-         dif[j] = u_a(j, t[t_it]) - q_act[j];
-         out_dif_act << scientific << setprecision(10) << dif[j] << " ";
+         if (ind - 3 >= 0) {
+            q_act[j] = eta_3 * qs[ind - 3][j] + eta_2 * qs[ind - 2][j] + eta_1 * qs[ind - 1][j] + eta_0 * qs[ind][j];
+            out_act << scientific << setprecision(10) << q_act[j] << " ";
+            dif[j] = u_a(j, t[t_it]) - q_act[j];
+            // out_dif_act << scientific << setprecision(10) << dif[j] << " ";
+         }
+         else {
+            cerr << "Error: not enough steps." << endl;
+            break;
+         }
       }
-      out_act << endl;
-      out_dif_act << endl;
+
+      // double dif_norm = sqrt(scMult(dif,dif));
+      // out_dif_act << scientific << setprecision(10) << t[t_it] << " " << dif_norm << endl;
+      // cout << scientific << setprecision(10) << t[t_it] << "q actual " << q_act[q_act.size() - 1] << " dif act " << dif[dif.size() - 1] << endl;
+      // out_act << endl;
+      // out_dif_act << endl;
       dif.clear();
       dif.resize(nodes_c);
       q_act.clear();
       q_act.resize(nodes_c);
-   }
-
-   for (int j = 0; j < nodes_c; j++) {
-      q_act[j] = qs[qs.size() - 1][j];
-      out_act << scientific << setprecision(10) << q_act[j] << " ";
-      dif[j] = u_a(j, t[t_it]) - q[j];
-      out_dif_act << scientific << setprecision(10) << dif[j] << " ";
    }
 
    out_act.close();
@@ -773,8 +774,9 @@ void u_actual() {
 void fourth_order_temporal_scheme() {
    dif.resize(nodes_c);
    u.resize(nodes_c);
-   if(use_llt) t_grid = generate_piecewise_constant_grid(2); // 2 - magnification factor
-   else t_grid = t;
+   // if(use_llt) t_grid = generate_piecewise_constant_grid(2); // 2 - magnification factor
+   // else t_grid = t;
+   t_grid = generate_piecewise_constant_grid(2);
    times_c = t_grid.size();
 
    // cout << "Fourth order temporal scheme with " << times_c << " time steps." << endl;
@@ -799,10 +801,13 @@ void fourth_order_temporal_scheme() {
       outf << scientific << setprecision(10) << q1[i] << " ";
    outf << endl;
    
+   dif_shod_t.clear(); // kill
+
    vector<duration<double, milli>> durations;
    while(t_it != times_c){
-      if (use_llt) calc_c();
-      else calc_c_normal();
+      // if (use_llt) calc_c();
+      // else calc_c_normal();
+      calc_c();
       global_A_hex();
 
       duration<double, milli> duration(0);
@@ -835,6 +840,9 @@ void fourth_order_temporal_scheme() {
       b.clear();
       q.clear();
    }
+
+   // double SHOD_D = sqrt(scMultDIF(dif_shod_t, dif_shod_t)); // kill
+   // cout << "SHOD DIF " << SHOD_D << endl;
 
    double total_time = 0;
    for (int i = 0; i < durations.size(); i++) {
@@ -871,7 +879,8 @@ void call_functions(bool is_static) {
    }
    else {
       fourth_order_temporal_scheme();
-      if (use_llt) u_actual();
+      // if (use_llt) u_actual(); // ?????????? //
+      u_actual();
    }
 }
 
@@ -891,8 +900,11 @@ int main() {
 
    input_all(use_gmsh_input, format); // Change to true for GMSH input and false for built-in input
    cout << "Input completed." << endl;
-   if (!use_llt) portrait();
-   else build_portrait_with_fill_in();
+   // if (!use_llt) portrait();
+   // else build_portrait_with_fill_in();
+
+   build_portrait_with_fill_in(); // ???????????? //
+   // portrait();
 
    cout << "Portrait completed." << endl;
 
